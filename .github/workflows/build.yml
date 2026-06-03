@@ -28,7 +28,7 @@ jobs:
       - name: 安装编译依赖和所有可用内核
         run: |
           apt-get update -qq
-          apt-get install -y curl xz-utils \
+          apt-get install -y --fix-missing curl xz-utils \
             build-essential autoconf automake libtool pkg-config \
             libtirpc-dev libblkid-dev uuid-dev zlib1g-dev \
             libattr1-dev libacl1-dev libudev-dev libssl-dev \
@@ -43,7 +43,7 @@ jobs:
             grep -v '\-cloud\-' | \
             while read pkg; do
               echo "安装: $pkg"
-              apt-get install -y "$pkg" || echo "跳过: $pkg"
+              apt-get install -y --fix-missing "$pkg" || echo "跳过: $pkg"
             done
 
       - name: 获取所有已安装的内核版本
