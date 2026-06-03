@@ -36,11 +36,15 @@ jobs:
             libelf-dev python3 python3-dev python3-setuptools \
             python3-cffi libffi-dev
 
-      - name: 获取内核版本
-        id: kernel
+      - name: 获取所有内核版本
+        id: kernels
         run: |
-          KERNEL_VER=$(ls /usr/src/ | grep "linux-headers-" | grep -v "\-common" | head -1 | sed 's/linux-headers-//')
-          echo "ver=${KERNEL_VER}" >> $GITHUB_OUTPUT
+          KERNEL_VERS=$(ls /usr/src/ | grep "linux-headers-" | grep -v "\-common" | sed 's/linux-headers-//')
+          echo "所有可用内核版本:"
+          echo "$KERNEL_VERS"
+          echo "vers<<EOF" >> $GITHUB_OUTPUT
+          echo "$KERNEL_VERS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: 下载编译 ZFS
         run: |
@@ -51,18 +55,23 @@ jobs:
           ./configure
           make -j$(nproc)
 
-      - name: 打包 ko 文件
-        id: package
+      - name: 为所有内核打包 ko 文件
         run: |
-          FILENAME="zfs-modules-${{ matrix.config.arch }}-${{ steps.kernel.outputs.ver }}-zfs${{ matrix.config.zfs_ver }}.tgz"
-          mkdir -p /tmp/zfs-modules
-          find /tmp/zfs-${{ matrix.config.zfs_ver }} -name "*.ko" -exec xz -k {} \;
-          find /tmp/zfs-${{ matrix.config.zfs_ver }} -name "*.ko.xz" -exec cp {} /tmp/zfs-modules/ \;
-          tar -czf "/tmp/${FILENAME}" -C /tmp zfs-modules/
-          echo "filename=${FILENAME}" >> $GITHUB_OUTPUT
+          mkdir -p /tmp/release-files
+          while IFS= read -r KERNEL_VER; do
+            [ -z "$KERNEL_VER" ] && continue
+            echo "正在为内核 ${KERNEL_VER} 打包..."
+            FILENAME="zfs-modules-${{ matrix.config.arch }}-${KERNEL_VER}-zfs${{ matrix.config.zfs_ver }}.tgz"
+            mkdir -p /tmp/zfs-modules
+            find /tmp/zfs-${{ matrix.config.zfs_ver }} -name "*.ko" -exec xz -k {} \;
+            find /tmp/zfs-${{ matrix.config.zfs_ver }} -name "*.ko.xz" -exec cp {} /tmp/zfs-modules/ \;
+            tar -czf "/tmp/release-files/${FILENAME}" -C /tmp zfs-modules/
+            rm -rf /tmp/zfs-modules
+            echo "✓ 已生成: ${FILENAME}"
+          done <<< "${{ steps.kernels.outputs.vers }}"
 
       - name: 发布到 Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: download
-          files: /tmp/${{ steps.package.outputs.filename }}
+          files: /tmp/release-files/*
