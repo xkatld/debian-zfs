@@ -56,9 +56,10 @@ jobs:
           make -j$(nproc)
 
       - name: 为所有内核打包 ko 文件
+        shell: bash
         run: |
           mkdir -p /tmp/release-files
-          while IFS= read -r KERNEL_VER; do
+          echo "${{ steps.kernels.outputs.vers }}" | while IFS= read -r KERNEL_VER; do
             [ -z "$KERNEL_VER" ] && continue
             echo "正在为内核 ${KERNEL_VER} 打包..."
             FILENAME="zfs-modules-${{ matrix.config.arch }}-${KERNEL_VER}-zfs${{ matrix.config.zfs_ver }}.tgz"
@@ -68,7 +69,7 @@ jobs:
             tar -czf "/tmp/release-files/${FILENAME}" -C /tmp zfs-modules/
             rm -rf /tmp/zfs-modules
             echo "✓ 已生成: ${FILENAME}"
-          done <<< "${{ steps.kernels.outputs.vers }}"
+          done
 
       - name: 发布到 Release
         uses: softprops/action-gh-release@v2
